@@ -1,6 +1,6 @@
 📄 README_cookies.md
 🍪 What is cookies?
-Some videos (especially private or region-locked ones) require login or just facebook being facebook sometimes . cookies lets yt-dlp download them by mimicking your browser session.
+Some videos (especially private or region-locked ones) require login or just facebook/IG being facebook/IG sometimes . cookies lets yt-dlp download them by mimicking your browser session.
 
 ⚠️ Security Warning
 This file contains your personal session data.
@@ -15,11 +15,11 @@ https://microsoftedge.microsoft.com/addons/detail/cookieeditor/neaplmfkghagebokk
 or 
 just search for cookie Editor
 
-Go to facebook.com and log in, yes you need to log in.
+Go to Instagram.com and log in, yes you need to log in.
 
 Click the extension and download/export the cookies in .json format.
 
-Paste the contents of the cookies into the file named fb_cookie.json
+Paste the contents of the cookies into the file named ig_cookie.json
 
 the script will read from this file for the cookies.
 

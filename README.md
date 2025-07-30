@@ -25,8 +25,10 @@ $ pip install -r requirements.txt
 ```
 ## Usage
 ```
-python reels.py <channel_name> <channel_reel_url>
+python reels.py <channel_name> <channel_reel_url> ## Optional <max_to_download>
 ```
+
+edit: You can edit the max amount of reels to download by adding a third argument in the command by just stating the number.
 
 ## For your Attention
 If you are downloading copyrighted content you should respect author's rights and use the content either for personal purposes or for non-commercial needs with proper mention and authorisation from the author.

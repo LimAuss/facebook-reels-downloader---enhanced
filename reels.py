@@ -1,177 +1,159 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from time import sleep
-import os
-import subprocess
-import csv
-import sys
-import json
+import os, subprocess, csv, sys, json, re
 
 def load_cookies(driver, cookie_path):
-    with open(cookie_path, 'r') as file:
-        cookies = json.load(file)
-    for cookie in cookies:
-        # Selenium requires the domain to be excluded sometimes
-        cookie.pop('sameSite', None)  # Remove unsupported fields
-        cookie.pop('storeId', None)
-        cookie.pop('hostOnly', None)
-        cookie.pop('session', None)
-        driver.add_cookie(cookie)
+    with open(cookie_path, 'r', encoding='utf-8') as f:
+        cookies = json.load(f)
+    for c in cookies:
+        # drop unsupported keys
+        for k in ('sameSite','storeId','hostOnly','session'):
+            c.pop(k, None)
+        driver.add_cookie(c)
 
-# Initialize the WebDriver
-# Ensure the chromedriver is in the system path or provide the absolute path
-driver = webdriver.Chrome()  # Update if needed, e.g., webdriver.Chrome(executable_path='/path/to/chromedriver')
+# ─── 1) BOOT UP SELENIUM + LOGIN ─────────────────────────────────────────────
+driver = webdriver.Chrome()
 driver.maximize_window()
 
-driver.get("https://facebook.com")  # go to FB first to set domain
+# hit IG to set cookie domain, then load yours
+driver.get("https://www.instagram.com")
 sleep(3)
-load_cookies(driver, "fb_cookie.json")
-driver.refresh()  # this will log you in
+load_cookies(driver, "ig_cookies.json")
+driver.refresh()
+sleep(3)
 
-# Open the webpage
-chanel = sys.argv[1]
-url = sys.argv[2]
+# ─── 2) NAVIGATE TO TARGET PROFILE/REELS PAGE ────────────────────────────────
+chanel = sys.argv[1]         # folder name
+url     = sys.argv[2]        # https://www.instagram.com/reel/ABC123/
+max_count  = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else None # optional max reels to download
 driver.get(url)
+sleep(5)                     # let initial content load
 
-# Close pop-up login
-sleep(5)
-# element = driver.find_element(By.XPATH, "//div[@aria-label='Close']")
-# element.click()
+# ─── 3) INFINITE SCROLL (if needed) ──────────────────────────────────────────
+MAX_SCROLLS   = 25      # absolute cap so we don't infinite loop
+SCROLL_DELAY  = 4       # seconds between scrolls
+seen_urls     = set()
+prev_pos      = -1
 
-# Define the number of scrolling steps and scroll interval
-scroll_steps = 100  # Adjust as needed
-scroll_interval = 6  # Adjust as needed
+for i in range(MAX_SCROLLS):
+    # 1) scroll
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+    sleep(SCROLL_DELAY)
 
-# Set an initial scroll position
-prev_scroll_position = 0
+    # 2) grab all reel links so far
+    anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/reel/']")
+    for a in anchors:
+        href = a.get_attribute('href').split('?')[0]
+        seen_urls.add(href)
 
-# Scroll to the bottom multiple times
-for _ in range(scroll_steps):
-    # Scroll down
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    print(f"Scroll #{i+1}: collected {len(seen_urls)} reels")
 
-    # Wait for the page to load new content (you may need to adjust the time)
-    sleep(scroll_interval)
-
-    # Get the current scroll position
-    curr_scroll_position = driver.execute_script("return window.pageYOffset;")
-
-    # If the scroll position remains the same, you've likely reached the bottom
-    if curr_scroll_position == prev_scroll_position:
-        print("Reached the bottom of the page.")
+    # 3) if we have enough, stop
+    if max_count is not None and len(seen_urls) >= max_count:
+        print(f"✅ Reached target of {max_count} reels—stopping scroll.")
         break
 
-    prev_scroll_position = curr_scroll_position
+    # 4) also stop if can’t scroll anymore
+    pos = driver.execute_script("return window.pageYOffset")
+    if pos == prev_pos:
+        print("⚠️ No more new content, stopping early.")
+        break
+    prev_pos = pos
 
-# Extract reel URLs
-a_elements = driver.find_elements(By.CSS_SELECTOR, 'a')
+# finally, build your URLs list (and cap it if needed)
+urls = list(seen_urls)
+if max_count is not None:
+    urls = urls[:max_count]
 
-# Create a chanel output directory (cross-platform)
+print(f"▶️  Ready to download {len(urls)} reels")
+
+# ─── 4) COLLECT REEL LINKS ────────────────────────────────────────────────────
+anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/reel/']")
+urls = []
+
+
+for a in anchors:
+    href = a.get_attribute('href')
+    if href and ('/reel/' in href or '/reels/' in href):
+        urls.append(href.split('?')[0])
+
+if max_count is not None:
+    urls = urls[:max_count]
+
+driver.quit()
+
+# make sure folder exists
 output_dir = os.path.join("output", chanel)
 os.makedirs(output_dir, exist_ok=True)
 
-# Save the extracted URLs to a CSV file
-csv_path = os.path.join("output", f"{chanel}.csv")
-with open(csv_path, "w") as f:
-    writer = csv.writer(f)
-    for element in a_elements:
-        href = element.get_attribute('href')
-        if href and '/reel/' in href:
-            writer.writerow([href.split('/?s=')[0]])
+# dump URLs to CSV in case you want it
+csv_path = os.path.join(output_dir, f"{chanel}.csv")
+with open(csv_path, "w", encoding="utf-8", newline="") as f:
+    w = csv.writer(f)
+    for u in urls:
+        w.writerow([u])
 
-f.close()
-driver.quit()
-
-# Bulk download reels with yt-dlp
-with open(csv_path, "r", encoding="utf-8") as file:
-    urls = [line.strip() for line in file if line.strip()]
-
-# 🔁 More reliable per-video downloader
+# ─── 5) DOWNLOAD EACH WITH FALLBACK ──────────────────────────────────────────
 for url in urls:
-    args = [
-        "yt-dlp",
-        url,
-        "--output", os.path.join(output_dir, "%(title).100s [%(id)s].%(ext)s"),
+    print(f"📥 Downloading {url}")
+    base_args = [
+        "yt-dlp", url,
+        "--output", os.path.join(output_dir, "%(id)s.%(ext)s"),
+        "--write-info-json",
         "--no-playlist",
         "--ignore-errors",
-        "--retries", "10",
-        "--fragment-retries", "10",
-        "--sleep-interval", "2",
-        "--max-sleep-interval", "5"
+        "--retries", "8",
+        "--fragment-retries", "5",
     ]
-    if os.path.exists("cookies.txt"):
-        args += ["--cookies", "cookies.txt"]
 
-    
-    
-    print(f"📥 Downloading: {url}")
-    result = subprocess.run(args, capture_output=True, text=True)
-
-    if result.returncode == 0:
-        print("   ✅ success")
-        continue
-
-
-    # If we get here, the first attempt failed:
-    print(f"   ⚠️ normal download failed, retrying with fallback…")
-    print(result.stderr)
-
-    # Fallback command—whatever flags you used manually
-    fallback_args = [
-        "yt-dlp",
-        url,
-        "--format", "bestvideo+bestaudio/best",
-        "--output", os.path.join(output_dir, "%(title).100s [%(id)s].%(ext)s"),
-        "--no-playlist",
-        "--ignore-errors",
-        "--verbose",
-    ]
-    if os.path.exists("cookies.txt"):
-        fallback_args += ["--cookies", "cookies.txt"]
-
-    
-    fb_result = subprocess.run(fallback_args, capture_output=True, text=True)
-    if fb_result.returncode == 0:
-        print("   ✅ fallback success!")
+    # 1st try
+    res = subprocess.run(base_args, capture_output=True, text=True)
+    if res.returncode == 0:
+        print("   ✅ downloaded")
     else:
-        print("   ❌ fallback also failed. Logged for later.")
-        print(fb_result.stderr)
-        with open("failed.txt", "a", encoding="utf-8") as log:
-            log.write(url + "\n")
-import re
-import os
+        print("   ⚠️ primary failed, retrying fallback…")
+        print(res.stderr)
+        fb = subprocess.run(
+            base_args + ["--format", "bestvideo+bestaudio/best", "--verbose"],
+            capture_output=True, text=True
+        )
+        if fb.returncode == 0:
+            print("   ✅ fallback worked")
+        else:
+            print("   ❌ both attempts failed — logging")
+            with open("failed.txt","a",encoding="utf-8") as flog:
+                flog.write(url+"\n")
 
-def parse_number(text):
-    match = re.search(r'([\d.]+)([KM]?)', text)
-    if not match:
-        return 0
-    num, suffix = match.groups()
-    num = float(num)
-    return int(num * 1_000_000 if suffix == 'M' else num * 1_000 if suffix == 'K' else num)
+# ─── 6) RENAME BY ENGAGEMENT (views/likes from .info.json) ───────────────────
+def safe_fname(s):
+    return re.sub(r'[\\/*?:"<>|]', "-", s)
 
-for filename in os.listdir(output_dir):
-    if not filename.endswith(".mp4"):
+for fname in os.listdir(output_dir):
+    if not fname.endswith(".info.json"):
+        continue
+    vid = fname[:-10]  # strip .info.json
+    info_path = os.path.join(output_dir, fname)
+    mp4_path  = os.path.join(output_dir, vid + ".mp4")
+    if not os.path.exists(mp4_path):
         continue
 
-    views_match = re.search(r'(\d+[\.\d]*[KM]?) views', filename)
-    likes_match = re.search(r'(\d+[\.\d]*[KM]?) reactions', filename)
+    data = json.load(open(info_path, encoding="utf-8"))
+    views = None  # not available
+    likes = data.get("like_count", 0) or 0
 
-    if not views_match or not likes_match:
-        continue
+    title = data.get("title", vid) or vid
+    safe = safe_fname(title)
 
-    views = parse_number(views_match.group(1))
-    likes = parse_number(likes_match.group(1))
+    new_mp4 = f"[{likes:,} likes] {safe} [{vid}].mp4"
+    new_json = new_mp4.replace(".mp4", ".info.json")
+    
+    os.rename(mp4_path, os.path.join(output_dir, new_mp4))
+    os.rename(info_path, os.path.join(output_dir, new_json))
 
-    if views == 0:
-        continue
+    print(f"🔄 Renamed to: {new_mp4}")
 
-    engagement = (likes / views) * 100
-    engagement_str = f"{engagement:.2f}%"
-
-    new_name = f"[{engagement_str}] {filename}"
-    src = os.path.join(output_dir, filename)
-    dst = os.path.join(output_dir, new_name)
-
-    os.rename(src, dst)
-    print(f"✅ Renamed: {new_name}")
+    # remove the info.json file if you don't need it
+    os.remove(os.path.join(output_dir, new_json))
+    
 
