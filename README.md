@@ -1,6 +1,8 @@
 # facebook-reels-downloader
 Download all reels on channel with a single command.
 
+YOULL NEED TO GET COOKIES FIRST, SEE README_cookie.md for details
+
 
 Facebook Reels Downloader is simple script written with Python that let you download and save your favorite Facebook reels to your computer in HD(High Defination) quality or in SD(Standard Defination) quality.
 
