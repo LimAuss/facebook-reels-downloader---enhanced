@@ -31,6 +31,7 @@ driver.refresh()  # this will log you in
 # Open the webpage
 chanel = sys.argv[1]
 url = sys.argv[2]
+max_count = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].isdigit() else None
 driver.get(url)
 
 # Close pop-up login
@@ -72,12 +73,21 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Save the extracted URLs to a CSV file
 csv_path = os.path.join("output", f"{chanel}.csv")
+reel_urls = []
+for element in a_elements:
+    href = element.get_attribute('href')
+    if href and '/reel/' in href:
+        url = href.split('/?s=')[0]
+        if url not in reel_urls:
+            reel_urls.append(url)
+        if max_count and len(reel_urls) >= max_count:
+            print(f"Reached {max_count} amount of links, stopping scrolling.")
+            break
+
 with open(csv_path, "w") as f:
     writer = csv.writer(f)
-    for element in a_elements:
-        href = element.get_attribute('href')
-        if href and '/reel/' in href:
-            writer.writerow([href.split('/?s=')[0]])
+    for url in reel_urls:
+        writer.writerow([url])
 
 f.close()
 driver.quit()
@@ -86,8 +96,11 @@ driver.quit()
 with open(csv_path, "r", encoding="utf-8") as file:
     urls = [line.strip() for line in file if line.strip()]
 
+total_urls = len(urls)
+downloaded_count = 0
+
 # 🔁 More reliable per-video downloader
-for url in urls:
+for i, url in enumerate(urls, start=1):
     args = [
         "yt-dlp",
         url,
@@ -102,21 +115,17 @@ for url in urls:
     if os.path.exists("cookies.txt"):
         args += ["--cookies", "cookies.txt"]
 
-    
-    
-    print(f"📥 Downloading: {url}")
+    print(f"📥 ({i}/{total_urls}) Downloading: {url}")
     result = subprocess.run(args, capture_output=True, text=True)
 
     if result.returncode == 0:
-        print("   ✅ success")
+        downloaded_count += 1
+        print(f"   ✅ success — Downloaded {downloaded_count}/{total_urls}")
         continue
 
-
-    # If we get here, the first attempt failed:
     print(f"   ⚠️ normal download failed, retrying with fallback…")
     print(result.stderr)
 
-    # Fallback command—whatever flags you used manually
     fallback_args = [
         "yt-dlp",
         url,
@@ -129,18 +138,29 @@ for url in urls:
     if os.path.exists("cookies.txt"):
         fallback_args += ["--cookies", "cookies.txt"]
 
-    
     fb_result = subprocess.run(fallback_args, capture_output=True, text=True)
     if fb_result.returncode == 0:
-        print("   ✅ fallback success!")
+        downloaded_count += 1
+        print(f"   ✅ fallback success! — Downloaded {downloaded_count}/{total_urls}")
     else:
         print("   ❌ fallback also failed. Logged for later.")
         print(fb_result.stderr)
         with open("failed.txt", "a", encoding="utf-8") as log:
             log.write(url + "\n")
+
+# 📊 Fancy summary
+failed_count = total_urls - downloaded_count
+success_rate = downloaded_count / total_urls * 100 if total_urls else 0
+
+print("\n📋 Download Summary:")
+print(f"   ✅ Successful: {downloaded_count}")
+print(f"   ❌ Failed:     {failed_count}")
+print(f"   🎯 Success rate: {success_rate:.2f}%")
+
 import re
 import os
 
+# Rename files based on engagement rate
 def parse_number(text):
     match = re.search(r'([\d.]+)([KM]?)', text)
     if not match:

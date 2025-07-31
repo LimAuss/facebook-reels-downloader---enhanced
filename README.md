@@ -25,7 +25,7 @@ $ pip install -r requirements.txt
 ```
 ## Usage
 ```
-python reels.py <channel_name> <channel_reel_url>
+python reels.py <channel_name> <channel_reel_url> ##optional <max_count_download>
 ```
 
 ## For your Attention
