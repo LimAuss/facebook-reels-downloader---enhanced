@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from time import sleep
-import os, subprocess, csv, sys, json, re
+import os, subprocess, csv, sys, json, re, logging
 
 def load_cookies(driver, cookie_path):
     with open(cookie_path, 'r', encoding='utf-8') as f:
@@ -19,7 +19,12 @@ driver.maximize_window()
 # hit IG to set cookie domain, then load yours
 driver.get("https://www.instagram.com")
 sleep(3)
-load_cookies(driver, "ig_cookies.json")
+try:
+    load_cookies(driver, "ig_cookies.json")
+except Exception as e:
+    print(f"❌ Failed to load cookies: {e}")
+    driver.quit()
+    sys.exit(1)
 driver.refresh()
 sleep(3)
 
