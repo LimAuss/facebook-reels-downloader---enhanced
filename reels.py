@@ -115,7 +115,16 @@ def rename_by_engagement(out_dir):
 
         # format engagement rate as percent with two decimals
         er_str = f"{rate:.2%}"
-        new_mp4 = f"[{er_str} ER] {safe} [{vid}].mp4"
+
+        # Format upload date
+        raw_date = data.get("upload_date")  # "20250730"
+        if raw_date and len(raw_date) == 8:
+            date_str = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}"
+        else:
+            date_str = "unknown-date"
+
+        # Combine all parts into the new filename
+        new_mp4  = f"[{er_str} ER] [{date_str}] {safe} [{vid}].mp4"
         new_json = new_mp4.replace(".mp4", ".info.json")
 
         os.rename(mp4_path, os.path.join(out_dir, new_mp4))
