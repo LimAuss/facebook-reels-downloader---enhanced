@@ -138,8 +138,18 @@ for url in urls:
 print(f"\nDownload summary: {success_count}/{total_count} reels downloaded successfully.")
 
 # ─── 6) RENAME BY ENGAGEMENT (views/likes from .info.json) ───────────────────
-def safe_fname(s):
-    return re.sub(r'[\\/*?:"<>|]', "-", s)
+def safe_fname(s, max_len=120):
+    # 1) replace any whitespace-control (newline/tab) with a space
+    s = re.sub(r'[\r\n\t]+', ' ', s)
+
+    # 2) replace Windows-illegal chars with dash
+    s = re.sub(r'[\\/*?:"<>|]', '-', s)
+
+    # 3) collapse multiple spaces, trim ends
+    s = re.sub(r'\s{2,}', ' ', s).strip()
+
+    # 4) truncate to a safe length so path <260 chars
+    return s[:max_len]
 
 renamed_titles = []
 
@@ -161,7 +171,7 @@ for fname in os.listdir(output_dir):
     else:
         date = "unknown"
 
-    title = data.get("title", vid) or vid
+    title = data.get("description", vid) or vid
     safe = safe_fname(title)
 
     new_mp4 = f"[{likes:,} likes] [{date}] {safe} [{vid}].mp4"
