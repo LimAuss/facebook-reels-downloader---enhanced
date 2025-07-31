@@ -100,6 +100,9 @@ with open(csv_path, "w", encoding="utf-8", newline="") as f:
         w.writerow([u])
 
 # ─── 5) DOWNLOAD EACH WITH FALLBACK ──────────────────────────────────────────
+success_count = 0
+total_count = len(urls)
+
 for url in urls:
     print(f"📥 Downloading {url}")
     base_args = [
@@ -116,6 +119,7 @@ for url in urls:
     res = subprocess.run(base_args, capture_output=True, text=True)
     if res.returncode == 0:
         print("   ✅ downloaded")
+        success_count += 1
     else:
         print("   ⚠️ primary failed, retrying fallback…")
         print(res.stderr)
@@ -125,14 +129,19 @@ for url in urls:
         )
         if fb.returncode == 0:
             print("   ✅ fallback worked")
+            success_count += 1
         else:
             print("   ❌ both attempts failed — logging")
             with open("failed.txt","a",encoding="utf-8") as flog:
                 flog.write(url+"\n")
 
+print(f"\nDownload summary: {success_count}/{total_count} reels downloaded successfully.")
+
 # ─── 6) RENAME BY ENGAGEMENT (views/likes from .info.json) ───────────────────
 def safe_fname(s):
     return re.sub(r'[\\/*?:"<>|]', "-", s)
+
+renamed_titles = []
 
 for fname in os.listdir(output_dir):
     if not fname.endswith(".info.json"):
@@ -146,11 +155,16 @@ for fname in os.listdir(output_dir):
     data = json.load(open(info_path, encoding="utf-8"))
     views = None  # not available
     likes = data.get("like_count", 0) or 0
+    date = data.get("upload_date", "unknown")
+    if date and date != "unknown" and len(date) == 8:
+        date = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    else:
+        date = "unknown"
 
     title = data.get("title", vid) or vid
     safe = safe_fname(title)
 
-    new_mp4 = f"[{likes:,} likes] {safe} [{vid}].mp4"
+    new_mp4 = f"[{likes:,} likes] [{date}] {safe} [{vid}].mp4"
     new_json = new_mp4.replace(".mp4", ".info.json")
     
     os.rename(mp4_path, os.path.join(output_dir, new_mp4))
@@ -158,7 +172,14 @@ for fname in os.listdir(output_dir):
 
     print(f"🔄 Renamed to: {new_mp4}")
 
+    renamed_titles.append(new_mp4)
+
     # remove the info.json file if you don't need it
     os.remove(os.path.join(output_dir, new_json))
-    
+
+# Write all renamed titles to a text file
+titles_txt_path = os.path.join(output_dir, "renamed_titles.txt")
+with open(titles_txt_path, "w", encoding="utf-8") as f:
+    for title in renamed_titles:
+        f.write(title + "\n")
 

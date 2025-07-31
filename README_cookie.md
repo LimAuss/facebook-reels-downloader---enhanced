@@ -19,7 +19,7 @@ Go to Instagram.com and log in, yes you need to log in.
 
 Click the extension and download/export the cookies in .json format.
 
-Paste the contents of the cookies into the file named ig_cookie.json
+Paste the contents of the cookies into the file named ig_cookie.json or make the file if it doesnt exist
 
 the script will read from this file for the cookies.
 
