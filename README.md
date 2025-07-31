@@ -1,7 +1,7 @@
 # facebook-reels-downloader
 Download all reels on channel with a single command.
 
-YOULL NEED TO GET COOKIES FIRST, SEE README_cookie.md for details
+YOU DONT NEED TO GET COOKIES FOR THIS ONE
 
 
 Facebook Reels Downloader is simple script written with Python that let you download and save your favorite Facebook reels to your computer in HD(High Defination) quality or in SD(Standard Defination) quality.
@@ -25,8 +25,10 @@ $ pip install -r requirements.txt
 ```
 ## Usage
 ```
-python reels.py <channel_name> <channel_reel_url>
+python reels.py <channel_name> <channel_reel_url> ##Optional <max_download_count>
 ```
+
+Tiktok sometimes puts a captcha for you to solve and this script pauses when it normally is, so just solve the captcha and press enter in the terminal to continue.
 
 ## For your Attention
 If you are downloading copyrighted content you should respect author's rights and use the content either for personal purposes or for non-commercial needs with proper mention and authorisation from the author.
