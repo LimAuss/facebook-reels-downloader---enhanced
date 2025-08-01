@@ -1,5 +1,5 @@
-# facebook-reels-downloader
-Download all reels on channel with a single command.
+# tiktok-downloader
+Download all tiktok on a channel or tag with a single command.
 
 YOU DONT NEED TO GET COOKIES FOR THIS ONE
 
