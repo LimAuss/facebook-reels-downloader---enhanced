@@ -43,6 +43,7 @@ def scrape_video_urls(driver, max_count=None):
     urls = list(seen)
     return urls[:max_count] if max_count else urls
 
+
 def download_videos(urls, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     # dump URLs
@@ -51,8 +52,13 @@ def download_videos(urls, out_dir):
         for u in urls:
             writer.writerow([u])
 
-    for url in urls:
-        logging.info(f"⬇️ Downloading {url}")
+    total = len(urls)
+    downloaded = 0
+    failed = 0
+    failed_urls = []
+
+    for idx, url in enumerate(urls, 1):
+        logging.info(f"⬇️ Downloading {url} ({idx}/{total})")
         base = [
             "yt-dlp", url,
             "--output", os.path.join(out_dir, "%(id)s.%(ext)s"),
@@ -68,12 +74,24 @@ def download_videos(urls, out_dir):
             )
             if fb.returncode != 0:
                 logging.error(f"   both attempts failed for {url}")
-                with open("failed.txt","a",encoding="utf-8") as flog:
+                with open("failed.txt", "a", encoding="utf-8") as flog:
                     flog.write(url + "\n")
+                failed += 1
+                failed_urls.append(url)
+            else:
+                downloaded += 1
+        else:
+            downloaded += 1
 
+        logging.info(f"   Progress: {downloaded} downloaded, {failed} failed out of {idx} attempted")
+
+    logging.info(f"📊 Download summary: {downloaded} downloaded, {failed} failed, {total} fetched")
+    if failed_urls:
+        logging.info(f"❌ Failed URLs saved to failed.txt")
 
 
 def rename_by_engagement(out_dir):
+    renamed_titles = []
     for fn in os.listdir(out_dir):
         if not fn.endswith(".info.json"):
             continue
@@ -110,8 +128,17 @@ def rename_by_engagement(out_dir):
         os.rename(info_path, os.path.join(out_dir, new_json))
         logging.info(f"🔄 Renamed → {new_mp4}")
 
+        renamed_titles.append(new_mp4)
+
         # remove JSON if you don’t need it
         os.remove(os.path.join(out_dir, new_json))
+
+    # Write sorted titles to txt for spreadsheet use
+    txt_path = os.path.join(out_dir, "renamed_titles.txt")
+    with open(txt_path, "w", encoding="utf-8") as f:
+        for title in sorted(renamed_titles):
+            f.write(title + "\n")
+    logging.info(f"📄 Renamed titles saved to {txt_path}")
 
 
 def main():
