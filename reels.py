@@ -71,28 +71,7 @@ def download_videos(urls, out_dir):
                 with open("failed.txt","a",encoding="utf-8") as flog:
                     flog.write(url + "\n")
 
-# def rename_by_likes(out_dir):
-#     for fn in os.listdir(out_dir):
-#         if not fn.endswith(".info.json"):
-#             continue
-#         vid = fn[:-10]
-#         info_path = os.path.join(out_dir, fn)
-#         mp4 = os.path.join(out_dir, vid + ".mp4")
-#         if not os.path.exists(mp4):
-#             continue
-#         data = json.load(open(info_path, encoding="utf-8"))
-#         # TikTok JSON: stats.diggCount = likes, stats.playCount = views
-#         stats = data.get("stats", {})
-#         likes = stats.get("diggCount", 0) or 0
-#         title = data.get("title") or vid
-#         safe = safe_fname(title)
-#         new_mp4 = f"[{likes:,} likes] {safe} [{vid}].mp4"
-#         new_json = new_mp4.replace(".mp4", ".info.json")
-#         os.rename(mp4, os.path.join(out_dir, new_mp4))
-#         os.rename(info_path, os.path.join(out_dir, new_json))
-#         logging.info(f"🔄 Renamed → {new_mp4}")
-#         # remove JSON if you don’t need it
-#         os.remove(os.path.join(out_dir, new_json))
+
 
 def rename_by_engagement(out_dir):
     for fn in os.listdir(out_dir):
@@ -137,7 +116,7 @@ def rename_by_engagement(out_dir):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python tiktok_scraper.py <folder_name> <tiktok_url> [max_count]")
+        print("Usage: python reels.py <folder_name> <tiktok_url> [max_count]")
         sys.exit(1)
 
     folder = sys.argv[1]
